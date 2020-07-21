@@ -17,29 +17,6 @@ namespace BovineLabs.Analyzers
     [InitializeOnLoad]
     public class ProjectFilesGeneration : AssetPostprocessor
     {
-#if ENABLE_VSTU
-        private const string CSharpVersion = "7.3";
-#endif
-
-        static ProjectFilesGeneration()
-        {
-#if ENABLE_VSTU
-            SyntaxTree.VisualStudio.Unity.Bridge.ProjectFilesGenerator.ProjectFileGeneration += (name, contents) =>
-            {
-                XDocument xml = XDocument.Parse(contents);
-
-                UpgradeProjectFile(xml);
-
-                // Write to the csproj file:
-                using (Utf8StringWriter str = new Utf8StringWriter())
-                {
-                    xml.Save(str);
-                    return str.ToString();
-                }
-            };
-#else
-        }
-
         private static string OnGeneratedCSProject(string path, string contents)
         {
             XDocument xml = XDocument.Parse(contents);
@@ -52,7 +29,6 @@ namespace BovineLabs.Analyzers
                 xml.Save(str);
                 return str.ToString();
             }
-#endif
         }
 
         private static void UpgradeProjectFile(XDocument doc)
@@ -62,9 +38,6 @@ namespace BovineLabs.Analyzers
             {
                 XNamespace xmlns = projectContentElement.Name.NamespaceName; // do not use var
                 SetRoslynAnalyzers(projectContentElement, xmlns);
-#if UNITY_VTSU
-                SetCSharpVersion(projectContentElement, xmlns);
-#endif
             }
         }
 
@@ -121,26 +94,6 @@ namespace BovineLabs.Analyzers
 
             projectContentElement.Add(itemGroup);
         }
-
-        // Don't need to do this for Rider as it has built in support for setting c# version.
-#if UNITY_VTSU
-        private static void SetCSharpVersion(XContainer projectContentElement, XNamespace ns)
-        {
-            // Find all PropertyGroups with Condition defining a Configuration and a Platform:
-            XElement[] nodes = projectContentElement.Descendants()
-                .Where(child =>
-                    child.Name.LocalName == "PropertyGroup"
-                    && (child.Attributes().FirstOrDefault(attr => attr.Name.LocalName == "Condition")?.Value
-                            .Contains("'$(Configuration)|$(Platform)'") ?? false))
-                .ToArray();
-
-            // Add <LangVersion>7.3</LangVersion> to these PropertyGroups:
-            foreach (XElement node in nodes)
-            {
-                node.Add(new XElement(ns + "LangVersion", CSharpVersion));
-            }
-        }
-#endif
 
         private static void SetOrUpdateProperty(
             XContainer root,
